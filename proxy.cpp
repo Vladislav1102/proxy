@@ -1,4 +1,5 @@
 #include "proxy.hpp"
+#include <netinet/in.h>
 
 volatile sig_atomic_t gSignalStatus;
 
@@ -8,7 +9,7 @@ Proxy::~Proxy() {}
 
 uint16_t Proxy::open_socket()
 {
-    socketfd = socket(AF_INET, SOCK_STREAM, 0);
+    uint16_t socketfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if (socketfd < 0)
     {
@@ -21,49 +22,40 @@ uint16_t Proxy::open_socket()
         throw "Error set settings socket";
         return EXIT_FAILURE;
     }
+    
     return socketfd;
 }
 
-uint16_t Proxy::setup_host() 
+void Proxy::install_settings_sockets(struct sockaddr_in* device, in_addr_t* address)
 {
-    uint16_t sock_host = open_socket();
+    device->sin_addr.s_addr = *address;
+    device->sin_family      = AF_INET;
+    device->sin_port        = htons(port);
+}
 
-    host.sin_addr.s_addr = INADDR_ANY;
-    host.sin_family      = AF_INET;
-    host.sin_port        = htons(port);
+void Proxy::setup_host() 
+{
+    socket_host = open_socket();
+    install_settings_sockets(&host, &address_host);
 
     memset(&(host.sin_zero), '\0', 8);
 
-    if (bind(socketfd, (struct sockaddr *)&host, sizeof(struct sockaddr)) < 0)
+    if (bind(socket_host, (struct sockaddr *)&host, sizeof(struct sockaddr)) < 0)
     {
         throw "Error binding socket";
     }
 
-    listen(sock_host, SOMAXCONN);
-    return sock_host;
+    listen(socket_host, SOMAXCONN);
 }
 
-uint16_t Proxy::setup_target()
+void Proxy::setup_target(std::string& input_addres)
 {
-    std::string input_addres;
-    uint16_t input_port = 0;
-
-    std::cout << "Введите адрес целевого сервера" << std::endl;
-    std::cin >> input_addres;
-
-    std::cout << "Введите порт" << std::endl;
-    std::cin >> input_port;
-
-    uint16_t sock_target = open_socket();
-
-    inet_pton(AF_INET, input_addres.c_str(), &target.sin_addr.s_addr);
-    target.sin_family = AF_INET;
-    target.sin_port   = htons(input_port);
-
-    return sock_target;
+    socket_target = open_socket();
+    inet_pton(AF_INET, input_addres.c_str(), &address_target);
+    install_settings_sockets(&target, &address_target);
 }
 
-void Proxy::handler(uint16_t socket_host, uint16_t socket_target)
+void Proxy::handler()
 {
     char data[MAX_SIZE] = {};
     size_t size_data;
@@ -76,16 +68,7 @@ void Proxy::handler(uint16_t socket_host, uint16_t socket_target)
 
 void Proxy::run_proxy()
 {
-    while (1) 
-    {
-        uint16_t host_socket   = setup_host();
-        uint16_t target_socket = setup_target();
-
-        if (connect(target_socket, (struct sockaddr*) &target, sizeof(sockaddr)) < 0)
-        {
-            std::cout << "Error connecting client" << std::endl;
-        }
-        std::cout << "Client connected" << std::endl;
-        handler(host_socket,  target_socket);
-    }
+    std::string input_addres;
+    std::cout << "Введите адрес целевого сервера" << std::endl;
+    std::cin >> input_addres;
 }

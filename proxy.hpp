@@ -11,7 +11,6 @@
 #include <arpa/inet.h>
 #include <csignal>
 
-
 static constexpr uint16_t port = 9000;
 static constexpr uint16_t MAX_SIZE = 4096;
 
@@ -24,15 +23,20 @@ public:
 
 private:
     uint16_t open_socket();
-    uint16_t setup_host();
-    uint16_t setup_target();
-    void handler(uint16_t socket_host, uint16_t socket_target);
+    void setup_host();
+    void setup_target(std::string& input_addres);
+    void handler();
+    void install_settings_sockets(struct sockaddr_in* device, in_addr_t* address);
     void signal_handler();
 
     struct sockaddr_in host, target;
 
+    in_addr_t address_host   = 0;
+    in_addr_t address_target = 0;
+
     uint8_t opt = 1;
-    uint16_t socketfd;
+    uint16_t socket_host;
+    uint16_t socket_target;
 };
 
 #endif //PROXY_HPP
