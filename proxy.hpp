@@ -23,7 +23,7 @@ public:
 
 private:
     int32_t open_socket();
-    void setup_host();
+    void setup_client();
     void setup_target(const std::string& input_addres);
     void poller();
     void install_settings_sockets(struct sockaddr_in* device, in_addr_t* address);

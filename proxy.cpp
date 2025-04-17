@@ -37,7 +37,7 @@ void Proxy::install_settings_sockets(struct sockaddr_in* device, in_addr_t* addr
     device->sin_port        = htons(port);
 }
 
-void Proxy::setup_host() 
+void Proxy::setup_client() 
 {
     this->socket_client = open_socket();
 
@@ -84,7 +84,16 @@ void Proxy::poller()
 
 void Proxy::run_proxy()
 {
+    setup_client();
+
     std::string input_addres;
     std::cout << "Введите адрес целевого сервера" << std::endl;
     std::cin >> input_addres;
+
+    setup_target(input_addres);
+
+    while(true)
+    {
+        poller();
+    }
 }
