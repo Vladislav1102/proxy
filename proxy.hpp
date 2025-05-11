@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/types.h>
+#include <sys/fcntl.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <netinet/in.h>
@@ -51,9 +52,13 @@ public:
     void setup() override;
     void handler_data() override;
 
+    void init_epoll();
+    void handle_connecting_client();
+
 private:
     uint16_t clientfd;
     in_addr_t address_client = INADDR_ANY;
+
     void connect_client_to_server();
 
     std::unique_ptr<InterfaceServer> real_server;
