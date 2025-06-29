@@ -13,59 +13,32 @@
 #include <arpa/inet.h>
 #include <csignal>
 #include <sys/epoll.h>
+#include <vector>
 
-static constexpr uint16_t port_client = 9000;
-static constexpr uint16_t port_server = 1234;
-static constexpr uint16_t MAX_BUFFER  = 4096;
+static constexpr uint16_t port_Rx = 9000;
+static constexpr uint16_t port_Tx = 1234;
+constexpr int MAX_EVENTS  = 100;
 
-class InterfaceServer
+class Proxy
 {
 public:
-    virtual void handler_data() = 0;
-    virtual void setup()        = 0;
-    virtual ~InterfaceServer()  = default;
-
-    struct sockaddr_in client_addr, server_addr;
-};
-
-class RealServer : public InterfaceServer 
-{
-public:
-     RealServer();
-    ~RealServer();
-
-    void setup() override;
-    void handler_data() override;
-
-private:
-    uint16_t serverfd;
-    in_addr_t address_server;
-    std::string input_address_server;
-};
-
-class Proxy : public InterfaceServer
-{
-public:
-     Proxy(InterfaceServer* server) : real_server(server) {};
+    Proxy();
     ~Proxy();
 
-    void setup() override;
-    void handler_data() override;
-
-    void init_epoll();
-    void handle_connecting_client();
-
+    void run();
 private:
-    uint16_t clientfd;
-    in_addr_t address_client = INADDR_ANY;
+    sockaddr_in Rx_addr, Tx_addr;
+    
+    in_addr_t address_Tx {0};
+    in_addr_t address_Rx = INADDR_ANY;
 
-    void connect_client_to_server();
-
-    std::unique_ptr<InterfaceServer> real_server;
+    int16_t fdRx, fdTx;
+    
+    void setup_Tx();
+    void setup_Rx();
+    void accept_connection();
+    void forward_data();
+    void set_nonblockfd(int16_t fd);
 };
-
-uint16_t open_socket();
-void settings_socket(struct sockaddr_in*, in_addr_t& address, int16_t port);
-void run(const InterfaceServer*);
 
 #endif //PROXY_HPP

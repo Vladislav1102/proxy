@@ -5,7 +5,7 @@ namespace
     uint16_t open_socket()
     {
         uint8_t optval = 1;
-        uint16_t new_socket = socket(AF_INET, SOCK_STREAM, 0);
+        uint16_t new_socket = socket(AF_INET, SOCK_DGRAM, 0);
         if (new_socket <= 0)
         {
             std::cerr << "Error open socket" << std::endl;
@@ -22,78 +22,87 @@ namespace
 
     void settings_socket(struct sockaddr_in* device, in_addr_t& address, int16_t port)
     {
+        memset(device, 0, sizeof(sockaddr_in));
         device->sin_family      = AF_INET;
         device->sin_addr.s_addr = address;
         device->sin_port        = htons(port);
     }
 } //namespace
 
-RealServer::RealServer() 
+Proxy::Proxy()
 {
-    serverfd = ::open_socket();
-}
-
-RealServer::~RealServer()
-{
-    close(serverfd);
-}
-
-void RealServer::setup()
-{
-    std::cout << "Введите адрес сервера: ";
-    std::cin >> input_address_server;
-
-    if (inet_pton(AF_INET, input_address_server.c_str(), &address_server) < 0)
-    {
-        std::cerr << "Error inet_pton Server" << std::endl;
-    }
-
-    ::settings_socket(&server_addr, address_server, port_server);
-}
-
-void RealServer::handler_data()
-{
-    char buffer_rx[MAX_BUFFER] = {};
-    char buffer_tx[MAX_BUFFER] = {};
-    bool running = true;
-
-    int8_t flag = fcntl(serverfd, F_GETFL, 0);
-    if (flag < 0)
-    {
-        std::cerr << "Error getting flag fd" << std::endl;
-    }
-
-    while (running)
-    {
-        memset(buffer_rx, 0, MAX_BUFFER);
-        ssize_t Rx = recv(serverfd, buffer_rx, sizeof(buffer_rx), 0);
-
-        if (Rx > 0)
-        {
-            std::cout << "[SERVER]->"<< buffer_rx << std::endl;
-            if (fcntl(serverfd, F_SETFL, flag | O_NONBLOCK) < 0)
-            {
-                std::cerr << "Error install nonblock mode" << std::endl;
-            }
-        } 
-        else if (Rx == 0)
-        {
-            std::cout << "Server disconected" << std::endl;
-            flag = false;
-        }
-        else if (Rx < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-        {
-            std::cerr << "Error receive data" << std::endl;
-            flag = false;
-        }
-    }
+    fdRx = ::open_socket();
+    fdTx = ::open_socket();
 }
 
 Proxy::~Proxy()
 {
-    if (clientfd < 0)
+    close(fdTx);
+    close(fdRx);
+}
+
+void Proxy::set_nonblockfd(int16_t fd)
+{
+    int16_t flag = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flag | O_NONBLOCK);
+}
+
+void Proxy::setup_Tx()
+{
+    std::string input_address_server;
+    std::cout << "Введите адрес куда нужно отправить: ";
+    std::cin >> input_address_server;
+
+    if (inet_pton(AF_INET, input_address_server.c_str(), &address_Tx) < 0)
     {
-        close(clientfd);
+        std::cerr << "Error inet_pton Server" << std::endl;
+    }
+
+    ::settings_socket(&Tx_addr, address_Tx, port_Tx);
+
+    if (connect(fdTx, reinterpret_cast<sockaddr*>(&Tx_addr), sizeof(Tx_addr)) < 0)
+    {
+        std::cerr << "Error connecting to Tx" << std::endl;
     }
 }
 
+void Proxy::setup_Rx()
+{
+    set_nonblockfd(fdRx);
+    ::settings_socket(&Rx_addr, address_Rx, port_Rx);   
+
+    if (bind(fdRx, reinterpret_cast<sockaddr*>(&Rx_addr), sizeof(Rx_addr)) < 0)
+    {
+        std::cerr << "Error binding clientfd" << std::endl;
+    }
+    if (listen(fdRx, SOMAXCONN) < 0)
+    {
+        std::cerr << "Error listening" << std::endl;
+    }
+}
+
+void Proxy::forward_data()
+{
+    std::vector<uint8_t>buffer;
+
+    bool flag = true;
+    while (flag)
+    {
+        ssize_t bytes = read(fdTx, &buffer, sizeof(buffer));
+        if (bytes <= 0) 
+        {
+            flag = false;
+        }
+
+        ssize_t sendData = sendto(fdTx, &buffer, sizeof(buffer), 0, reinterpret_cast<sockaddr*>(&Tx_addr), sizeof(Tx_addr));
+        if (sendData == -1)
+        {
+            std::cerr << "Error sending data" << std::endl;
+        }
+
+        for (int i : buffer)
+        {
+            std::cout << i << std::endl;
+        }
+    }
+}
