@@ -1,8 +1,15 @@
 #include "proxy.hpp"
 
-int main(void)
+int main()
 {
     Proxy proxy;
-    proxy.run_proxy();
-    return 0;
+    try
+    {
+        proxy.run();
+    }
+    catch(const std::exception& e)
+    {
+        std::cout << "exception!!!" << e.what() << std::endl;
+    }
+    return EXIT_SUCCESS;
 }
